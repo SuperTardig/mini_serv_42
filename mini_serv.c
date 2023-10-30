@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 		if (select(max + 1, &ready, NULL, NULL, NULL) < 0)
 				writeError("Fatal Error\n");
 
-		for (int socketId = 0; socketId < max; socketId++){
+		for (int socketId = 0; socketId <= max; socketId++){
 			if (FD_ISSET(socketId, &ready)){
 				if (socketId == socket){
 					int client = accept(socket, NULL, NULL);
