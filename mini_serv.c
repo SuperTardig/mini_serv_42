@@ -21,9 +21,9 @@ void writeError(char* message){
 	exit(1);
 }
 
-void sendAll(int clientFd, char* message){
+void sendAll(int id, char* message){
 	for (int fd = 0; fd < max + 1; fd++)
-		if (fd != clientFd)
+		if (fd != id)
 			send(fd, message, strlen(message), SO_NOSIGPIPE);
 }
 
@@ -38,48 +38,44 @@ int main(int argc, char** argv) {
 	servaddr.sin_port = htons(atoi(argv[1]));
 	if ((bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0 || listen(sockfd, SOMAXCONN) != 0)
 		writeError("Fatal error\n");
-
 	FD_ZERO(&active);
 	FD_SET(sockfd, &active);
 	max = sockfd;
-
 	while (1){
 		ready = active;
 		if (select(max + 1, &ready, NULL, NULL, NULL) < 0) 
 			continue;
-		for (int fd = 0; fd < max + 1; fd++){
-			if (!(FD_ISSET(fd, &ready)))
+		for (int id = 0; id < max + 1; id++){
+			if (!(FD_ISSET(id, &ready)))
 				continue;
-			if (fd == sockfd){
-				int clientFd = accept(sockfd, NULL, NULL);
-				if (clientFd < 0)
+			if (id == sockfd){
+				int client = accept(sockfd, NULL, NULL);
+				if (client < 0)
 					continue;
-				max = clientFd > max ? clientFd : max;
-				ids[clientFd] = maxId++;
-				FD_SET(clientFd, &active);
-				sprintf(msg, "server: client %d just arrived\n", ids[clientFd]);
-				sendAll(clientFd, msg);
+				max = client > max ? client : max;
+				ids[client] = maxId++;
+				FD_SET(client, &active);
+				sprintf(msg, "server: client %d just arrived\n", ids[client]);
+				sendAll(client, msg);
 			} else {
-				char clientBuf[200000];
-				memset(clientBuf, 0, sizeof(clientBuf));
-				int recvLen = recv(fd, clientBuf, 200000, 0);
-
-				if (recvLen > 0){
-					sprintf(msg, "client %d: ", ids[fd]);
-					sendAll(fd, msg);
-					for (int i = 0; i < recvLen; i++){
-						sending[0] = clientBuf[i];
-						sendAll(fd, sending);
-						if (i + 1 < recvLen && sending[0] == '\n')
-							sendAll(fd, msg);
+				char buffer[200000];
+				int read = recv(id, buffer, 200000, 0);
+				if (read > 0){
+					sprintf(msg, "client %d: ", ids[id]);
+					sendAll(id, msg);
+					for (int i = 0; i < read; i++){
+						sending[0] = buffer[i];
+						sendAll(id, sending);
+						if (i + 1 < read && sending[0] == '\n')
+							sendAll(id, msg);
 					}
 					if (sending[0] != '\n')
-						sendAll(fd, "\n");
+						sendAll(id, "\n");
 				} else {
-					sprintf(msg, "server: client %d just left\n", ids[fd]);
-					sendAll(fd, msg);
-					FD_CLR(fd, &active);
-					close(fd);
+					sprintf(msg, "server: client %d just left\n", ids[id]);
+					sendAll(id, msg);
+					FD_CLR(id, &active);
+					close(id);
 				}
 			}
 		}
